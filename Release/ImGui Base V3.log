@@ -1,0 +1,4 @@
+﻿  renderer.cpp
+imgui_impl_dx11.obj : error LNK2001: unresolved external symbol _D3DCompile@44
+renderer.obj : error LNK2001: unresolved external symbol _D3D11CreateDeviceAndSwapChain@48
+Z:\GTAMODSWORKSPACE\aaaaaaa\ImGuiBase-main\ImGuiBase-main\ImGui Base V3 With UI\Release\ImGui Base V3.exe : fatal error LNK1120: 2 unresolved externals
