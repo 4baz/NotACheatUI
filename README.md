@@ -16,7 +16,7 @@ but, like, it works. Which is better than nothing
 
 - creds to sk1d#0187 for the cool header design. :)
 
-Preview Image (i drew a cock on the image in the bytemap so until i change it heres a censored preview):
+Preview Images:
 
 ![alt text](https://cdn.discordapp.com/attachments/1004016705313452112/1005848790428823623/unknown.png)
 
