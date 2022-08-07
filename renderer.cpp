@@ -1,5 +1,8 @@
 #include "includes.hpp"
 #include "utils.hpp"
+#include <iostream>
+#include <string>
+#include <functional>
 
 static ID3D11Device           * g_pd3dDevice           = nullptr;
 static ID3D11DeviceContext    * g_pd3dDeviceContext    = nullptr;
@@ -31,9 +34,13 @@ come join us and visit our website!
 
 
 
-
+//menu settings
 int testx1 = 0;
-int testy1 = 0;
+int testy1 = 47;
+bool opensettings = false;
+
+
+
 int test3;
 int test4;
 
@@ -60,6 +67,10 @@ const char* infoText;
 
 bool renderheader = false;
 
+bool testbool = false;
+bool testbool2 = false;
+
+ID3D11ShaderResourceView* Image = nullptr;//pointer to image thats loaded in imgui main
 
 
 //Made by 4baz. Based of submenu switch commonly used for gta mod menus
@@ -68,7 +79,6 @@ bool renderheader = false;
 
 1. opening/closing is pepega need to fix that
 
-2. want to get d3d11  image loading and shit for loading images into gta
 
 3. all this code is pepega tryna retrofit//make 2take1 style submenu switch into it might give up and wait a few years till im better at coding tbh
 
@@ -80,13 +90,13 @@ enum submenus {
 
     CLOSED,
     MAINMENU,
-    TESTMENU,
+    SETTINGS,
     TESTMENUDOS,
 
 };
 
 void MainMenu();
-void testmenu();
+void settings();
 void testmenudos();
 
 void submenuHandler()
@@ -94,7 +104,7 @@ void submenuHandler()
     switch (submenu)
     {
     case MAINMENU: MainMenu(); break;
-    case TESTMENU: testmenu(); break;
+    case SETTINGS: settings(); break;
     case TESTMENUDOS: testmenudos(); break;
 
     }
@@ -111,6 +121,8 @@ void changeSubmenu(int newSubmenu)
     submenu = newSubmenu;
     submenuLevel++;
 }
+
+//rgb structure to set  colours
 struct RGBA {
     int R;
     int G;
@@ -118,10 +130,35 @@ struct RGBA {
     int A;
 };
 
+
+//menu colours 
 RGBA textmain{ 255,255,255,255 };
-RGBA highlightmain{ 0,0,0,255 };
+RGBA highlighttextmain{ 0,0,0,255 };
+
+//submenu arrows
+
+RGBA submenuarrows{ 255,255,255,255 };
+RGBA highlightsubmenuarrows{ 0,0,0,255 };
 
 
+//seperatorrect
+
+RGBA seperatorrect{ 0,0,0,255 };
+RGBA seperatorrectoutline{ 255,255,255,255 };
+
+//scroller
+
+RGBA scrollerrect{ 255,255,255,160 };
+
+
+//background
+
+RGBA backgroundrect{ 0,0,0,160 };
+RGBA backgroundrectoutline{ 0,0,0,160 };
+
+
+
+//parse data to low level addtext imgui function
 void drawtext(const char* text, float x, float y, /* float scalex, float scaley,*/ RGBA colour) {
 
     ImDrawList* drawtext = ImGui::GetBackgroundDrawList();
@@ -132,7 +169,56 @@ void drawtext(const char* text, float x, float y, /* float scalex, float scaley,
 
 
 }
+//break option with centred (ish)
+void addbreak(const char* breaktext, const char* optioninfo = NULL) {
 
+    optionTextToAdd = breaktext;
+    optionCount++;
+
+
+    int toChar = strlen(breaktext);
+   
+
+  //  const char* str = breaktext;
+       
+  
+
+    //text changes colour when option selected
+    if (currentOption == optionCount) {
+        infoText = optioninfo;
+
+
+        if (currentOption <= maxOptions && optionCount <= maxOptions) {
+            drawtext(optionTextToAdd, testx1 + 160- toChar, optionCount * 40 + 50 + testy1, highlighttextmain);
+        }
+        else if ((optionCount > (currentOption - maxOptions)) && optionCount <= currentOption) {
+            drawtext(optionTextToAdd, testx1 + 160- toChar, (optionCount - (currentOption - maxOptions)) * 40 + 50 + testy1, highlighttextmain);
+
+        }
+
+    }
+    //normal text
+    else {
+
+
+        if (currentOption <= maxOptions && optionCount <= maxOptions) {
+            drawtext(optionTextToAdd, testx1 + 160 - toChar, optionCount * 40 + 50 + testy1, textmain);
+        }
+        else if ((optionCount > (currentOption - maxOptions)) && optionCount <= currentOption) {
+            drawtext(optionTextToAdd, testx1 + 160 - toChar, (optionCount - (currentOption - maxOptions)) * 40 + 50 + testy1, textmain);
+
+        }
+
+
+
+
+
+    }
+
+
+
+}
+//base add option that every other option is based off
 void addoption(const char* text, const char* optioninfo = NULL) {
 
     optionTextToAdd = text;
@@ -145,10 +231,10 @@ void addoption(const char* text, const char* optioninfo = NULL) {
 
 
         if (currentOption <= maxOptions && optionCount <= maxOptions) {
-            drawtext(optionTextToAdd, testx1 + 20, optionCount * 40 + 50 + testy1, highlightmain);
+            drawtext(optionTextToAdd, testx1 + 20, optionCount * 40 + 50 + testy1, highlighttextmain);
         }
         else if ((optionCount > (currentOption - maxOptions)) && optionCount <= currentOption) {
-            drawtext(optionTextToAdd, testx1 + 20, (optionCount - (currentOption - maxOptions)) * 40 + 50 + testy1, highlightmain);
+            drawtext(optionTextToAdd, testx1 + 20, (optionCount - (currentOption - maxOptions)) * 40 + 50 + testy1, highlighttextmain);
 
         }
 
@@ -174,19 +260,347 @@ void addoption(const char* text, const char* optioninfo = NULL) {
 
 
 }
-void AddSubmenu(const char* option, int submenu, const char* info = NULL)
+//like addoption but can execute code in the function
+bool AddFunction(const char* text, std::function<void()> function,const char* optioninfo = NULL) {
+
+    addoption(text,optioninfo);
+
+    if (currentOption == optionCount && GetAsyncKeyState(VK_RETURN) & 1) {
+        function();
+       // PlayFrontendSound("SELECT");
+        return true;
+    }
+
+    return false;
+
+
+    /*Example use case:   
+                   if (AddFunction("Classic Five", [] {
+
+					        int VehID = PED::GET_VEHICLE_PED_IS_IN(PLAYER::PLAYER_PED_ID(), 0);
+					        VEHICLE::SET_VEHICLE_MOD_KIT(VehID, 0);
+					        VEHICLE::SET_VEHICLE_WHEEL_TYPE(VehID, 1);
+					        VEHICLE::SET_VEHICLE_MOD(VehID, 23, 0, 0);
+					
+                    }));
+  
+    */
+
+
+}
+bool AddInt(const char* option, int* inttochange, int min, int max, int increments, std::function<void()> functiontorunifenter, const char* info = NULL)
+{
+    addoption(option, info);
+
+    char buf[30];
+
+    snprintf(buf, sizeof(buf), "[%i]", *inttochange);
+
+
+    if (currentOption == optionCount) {
+
+        if (currentOption <= maxOptions && optionCount <= maxOptions)
+            drawtext(buf, testx1 + 295, optionCount * 40 + 50 + testy1, highlighttextmain);
+
+        else if ((optionCount > (currentOption - maxOptions)) && optionCount <= currentOption)
+            drawtext(buf, testx1 + 295, (optionCount - (currentOption - maxOptions)) * 40 + 50 + testy1, highlighttextmain);
+
+    }
+    else {
+        if (currentOption <= maxOptions && optionCount <= maxOptions)
+            drawtext(buf, testx1 + 295, optionCount * 40 + 50 + testy1, textmain);
+
+        else if ((optionCount > (currentOption - maxOptions)) && optionCount <= currentOption)
+            drawtext(buf, testx1 + 295, (optionCount - (currentOption - maxOptions)) * 40 + 50 + testy1, textmain);
+
+    }
+
+    if (currentOption == optionCount) {
+
+        if (GetAsyncKeyState(VK_RIGHT) & 1) {
+
+          //  PlayFrontendSound("NAV_UP_DOWN");
+
+            if (*inttochange >= max)
+                *inttochange = min;
+
+            else
+                *inttochange = *inttochange + increments;
+        }
+
+        else if (GetAsyncKeyState(VK_LEFT) & 1) {
+        //    PlayFrontendSound("NAV_UP_DOWN");
+
+            if (*inttochange <= min)
+                *inttochange = max;
+
+            else
+                *inttochange = *inttochange - increments;
+        }
+    }
+   // if (currentOption == optionCount && GetAsyncKeyState(VK_RETURN) & 1) 
+      if (currentOption == optionCount && (GetAsyncKeyState(VK_LEFT) || GetAsyncKeyState(VK_RIGHT)) & 1) {
+        functiontorunifenter();
+        // PlayFrontendSound("SELECT");
+        return true;
+    }
+
+    return false;
+}
+bool AddFloat(const char* option, float* floattochange, float min, float max, int increments, std::function<void()> functiontorunifenter, const char* info = NULL)
+{
+    addoption(option, info);
+
+    char buf[30];
+
+    snprintf(buf, sizeof(buf), "[%g]", *floattochange);
+
+
+    if (currentOption == optionCount) {
+
+        if (currentOption <= maxOptions && optionCount <= maxOptions)
+            drawtext(buf, testx1 + 295, optionCount * 40 + 50 + testy1, highlighttextmain);
+
+        else if ((optionCount > (currentOption - maxOptions)) && optionCount <= currentOption)
+            drawtext(buf, testx1 + 295, (optionCount - (currentOption - maxOptions)) * 40 + 50 + testy1, highlighttextmain);
+
+    }
+    else {
+        if (currentOption <= maxOptions && optionCount <= maxOptions)
+            drawtext(buf, testx1 + 295, optionCount * 40 + 50 + testy1, textmain);
+
+        else if ((optionCount > (currentOption - maxOptions)) && optionCount <= currentOption)
+            drawtext(buf, testx1 + 295, (optionCount - (currentOption - maxOptions)) * 40 + 50 + testy1, textmain);
+
+    }
+
+    if (currentOption == optionCount) {
+        if (GetAsyncKeyState(VK_RIGHT) & 1) {
+
+        //    PlayFrontendSound("NAV_UP_DOWN");
+            if (*floattochange >= max)
+                *floattochange = min;
+            else
+                *floattochange = *floattochange + increments;
+
+        }
+
+        else if (GetAsyncKeyState(VK_LEFT) & 1) {
+
+       //     PlayFrontendSound("NAV_UP_DOWN");
+            if (*floattochange <= min)
+                *floattochange = max;
+            else
+                *floattochange = *floattochange - increments;
+        }
+    }
+    if (currentOption == optionCount && (GetAsyncKeyState(VK_LEFT) || GetAsyncKeyState(VK_RIGHT)) & 1) {
+        functiontorunifenter();
+        // PlayFrontendSound("SELECT");
+        return true;
+    }
+
+    return false;
+}
+void AddString(const char* option,const char* chartochange, int *var, int min, int max, const char* info = NULL)
 {
 
+    char buf[30];
+
+    sprintf(buf, "< %s >", chartochange);
+
+    addoption(option, info);
+
+    if (currentOption == optionCount) {
+
+        if (currentOption <= maxOptions && optionCount <= maxOptions)
+            drawtext(buf, testx1 + 280, optionCount * 40 + 50 + testy1, highlighttextmain);
+
+        else if ((optionCount > (currentOption - maxOptions)) && optionCount <= currentOption)
+            drawtext(buf, testx1 + 280, (optionCount - (currentOption - maxOptions)) * 40 + 50 + testy1, highlighttextmain);
+
+    }
+    else {
+        if (currentOption <= maxOptions && optionCount <= maxOptions)
+            drawtext(buf, testx1 + 280, optionCount * 40 + 50 + testy1, textmain);
+
+        else if ((optionCount > (currentOption - maxOptions)) && optionCount <= currentOption)
+            drawtext(buf, testx1 + 280, (optionCount - (currentOption - maxOptions)) * 40 + 50 + testy1, textmain);
+
+    }
+
+    if (currentOption == optionCount) {
+        if (GetAsyncKeyState(VK_RIGHT) & 1) {
+
+        //    PlayFrontendSound("NAV_UP_DOWN");
+            if (*var >= max)
+                *var = min;
+            else
+                *var = *var + 1;
+
+        }
+        else if (GetAsyncKeyState(VK_LEFT) & 1) {
+
+      //      PlayFrontendSound("NAV_UP_DOWN");
+            if (*var <= min)
+                *var = max;
+            else
+                *var = *var - 1;
+        }
+    }
+  ///  if (currentOption == optionCount && (GetAsyncKeyState(VK_LEFT) || GetAsyncKeyState(VK_RIGHT)) & 1) {
+  //      functiontorunifenter();
+        // PlayFrontendSound("SELECT");
+   //     return true;
+   // }
+
+   
+}
+//overload to allow function execution
+void AddString(char* optiontext,const char* option, int* var, int min, int max, std::function<void()> callback, const char* info = NULL)
+{
+    AddString(optiontext, option, var, min, max, info);
+    if (currentOption == optionCount && (GetAsyncKeyState(VK_LEFT) || GetAsyncKeyState(VK_RIGHT)) & 1)
+        callback();
+}
+
+
+
+void AddToggle(const char* text, bool* toggle,const char* optioninfo=NULL) {
+
+    addoption(text, optioninfo);
+
+    //If Enter is pressed it changes the bool to On/Off
+    if (currentOption == optionCount && GetAsyncKeyState(VK_RETURN) & 1) {
+      //  PlayFrontendSound("SELECT");
+        *(bool*)toggle = !*(bool*)toggle;
+    }
+
+
+    //if toggle is presssed change toggle on menu ting
+    if (*(bool*)toggle) {
+        if (currentOption == optionCount) {
+        
+            if (currentOption <= maxOptions && optionCount <= maxOptions)
+                drawtext("ON", testx1 + 300, optionCount * 40 + 50 + testy1, highlighttextmain);
+          
+            else if ((optionCount > (currentOption - maxOptions)) && optionCount <= currentOption)
+                drawtext("ON", testx1 + 300, (optionCount - (currentOption - maxOptions)) * 40 + 50 + testy1, highlighttextmain);
+
+        }
+        else {
+            if (currentOption <= maxOptions && optionCount <= maxOptions)
+                drawtext("ON", testx1 + 300, optionCount * 40 + 50 + testy1, textmain);
+
+            else if ((optionCount > (currentOption - maxOptions)) && optionCount <= currentOption)
+                drawtext("ON", testx1 + 300, (optionCount - (currentOption - maxOptions)) * 40 + 50 + testy1, textmain);
+
+        }
+
+
+
+    }
+    else {
+        if (currentOption == optionCount) {
+
+
+            if (currentOption <= maxOptions && optionCount <= maxOptions)
+                drawtext("OFF", testx1 + 300, optionCount * 40 + 50 + testy1, highlighttextmain);
+
+            else if ((optionCount > (currentOption - maxOptions)) && optionCount <= currentOption)
+                drawtext("OFF", testx1 + 300, (optionCount - (currentOption - maxOptions)) * 40 + 50 + testy1, highlighttextmain);
+
+        }
+        else {
+            if (currentOption <= maxOptions && optionCount <= maxOptions)
+                drawtext("OFF", testx1 + 300, optionCount * 40 + 50 + testy1, textmain);
+
+            else if ((optionCount > (currentOption - maxOptions)) && optionCount <= currentOption)
+                drawtext("OFF", testx1 + 300, (optionCount - (currentOption - maxOptions)) * 40 + 50 + testy1, textmain);
+        }
+
+    }
+
+
+}
+
+
+
+
+
+
+
+void AddSubmenu(const char* option, int submenu, const char* info = NULL)
+{
+    int  linetest3 = -240;//too lazy to change values so this is now permanent integer
 
 
     char buf[30];
-    snprintf(buf, sizeof(buf), "%s~h~ ~m~>", option);
+    snprintf(buf, sizeof(buf), "%s", option);
     addoption(buf, info);
 
     if (currentOption == optionCount && GetAsyncKeyState(VK_RETURN) & 1) {
         //  PLAY SUBMENU SWITCH SOUND HERE IF WANTED
         changeSubmenu(submenu);
     }
+
+
+    //select option list
+
+    //professional coding right here boys look at that maths 
+    ImDrawList* subarrow = ImGui::GetBackgroundDrawList();
+
+  /*  if (currentOption == optionCount) {
+        if (currentOption <= maxOptions && optionCount <= maxOptions) {
+            subarrow->AddTriangleFilled(ImVec2(testx1 + 322, ((optionCount * 40) + testy1 + 306) + linetest3), ImVec2(testx1 + 322, ((optionCount * 40) + testy1 + 290) + linetest3), ImVec2(testx1 + 331, ((optionCount * 40) + testy1 + 298) + linetest3), IM_COL32(highlightsubmenuarrows.R, highlightsubmenuarrows.G, highlightsubmenuarrows.B, highlightsubmenuarrows.A));
+
+        }
+        else {
+            subarrow->AddTriangleFilled(ImVec2(testx1 + 322, ((optionCount - (currentOption - maxOptions)) * 40 + testy1 + 306) + linetest3), ImVec2(testx1 + 322, ((optionCount - (currentOption - maxOptions)) * 40 + testy1 + 290) + linetest3), ImVec2(testx1 + 331, ((optionCount - (currentOption - maxOptions)) * 40 + testy1 + 298) + linetest3), IM_COL32(highlightsubmenuarrows.R, highlightsubmenuarrows.G, highlightsubmenuarrows.B, highlightsubmenuarrows.A));
+
+        }
+    }
+    else {
+        if (currentOption <= maxOptions && optionCount <= maxOptions) {
+           subarrow->AddTriangleFilled(ImVec2(testx1 + 322, ((optionCount * 40) + testy1 + 306) + linetest3), ImVec2(testx1 + 322, ((optionCount * 40) + testy1 + 290) + linetest3), ImVec2(testx1 + 331, ((optionCount * 40) + testy1 + 298) + linetest3), IM_COL32(submenuarrows.R, submenuarrows.G, submenuarrows.B, submenuarrows.A));
+
+        }
+        else {
+            subarrow->AddTriangleFilled(ImVec2(testx1 + 322, ((optionCount - (currentOption - maxOptions)) * 40 + testy1 + 306) + linetest3), ImVec2(testx1 + 322, ((optionCount - (currentOption - maxOptions)) * 40 + testy1 + 290) + linetest3), ImVec2(testx1 + 331, ((optionCount - (currentOption - maxOptions)) * 40 + testy1 + 298) + linetest3), IM_COL32(submenuarrows.R, submenuarrows.G, submenuarrows.B, submenuarrows.A));
+
+        }
+
+    }*/
+
+
+    if (currentOption == optionCount) {
+
+        if (currentOption <= maxOptions && optionCount <= maxOptions)
+        //    drawtext(">", testx1 + 300, optionCount * 40 + 50 + testy1, highlighttextmain);
+        subarrow->AddTriangleFilled(ImVec2(testx1 + 322, ((optionCount * 40) + testy1 + 306) + linetest3), ImVec2(testx1 + 322, ((optionCount * 40) + testy1 + 290) + linetest3), ImVec2(testx1 + 331, ((optionCount * 40) + testy1 + 298) + linetest3), IM_COL32(highlightsubmenuarrows.R, highlightsubmenuarrows.G, highlightsubmenuarrows.B, highlightsubmenuarrows.A));
+
+        else if ((optionCount > (currentOption - maxOptions)) && optionCount <= currentOption)
+         //   drawtext(">", testx1 + 300, (optionCount - (currentOption - maxOptions)) * 40 + 50 + testy1, highlighttextmain);
+            subarrow->AddTriangleFilled(ImVec2(testx1 + 322, ((optionCount - (currentOption - maxOptions)) * 40 + testy1 + 306) + linetest3), ImVec2(testx1 + 322, ((optionCount - (currentOption - maxOptions)) * 40 + testy1 + 290) + linetest3), ImVec2(testx1 + 331, ((optionCount - (currentOption - maxOptions)) * 40 + testy1 + 298) + linetest3), IM_COL32(highlightsubmenuarrows.R, highlightsubmenuarrows.G, highlightsubmenuarrows.B, highlightsubmenuarrows.A));
+
+    }
+    else {
+        if (currentOption <= maxOptions && optionCount <= maxOptions)
+          //  drawtext(">", testx1 + 300, optionCount * 40 + 50 + testy1, textmain);
+            subarrow->AddTriangleFilled(ImVec2(testx1 + 322, ((optionCount * 40) + testy1 + 306) + linetest3), ImVec2(testx1 + 322, ((optionCount * 40) + testy1 + 290) + linetest3), ImVec2(testx1 + 331, ((optionCount * 40) + testy1 + 298) + linetest3), IM_COL32(submenuarrows.R, submenuarrows.G, submenuarrows.B, submenuarrows.A));
+
+        else if ((optionCount > (currentOption - maxOptions)) && optionCount <= currentOption)
+          //  drawtext(">", testx1 + 300, (optionCount - (currentOption - maxOptions)) * 40 + 50 + testy1, textmain);
+        subarrow->AddTriangleFilled(ImVec2(testx1 + 322, ((optionCount - (currentOption - maxOptions)) * 40 + testy1 + 306) + linetest3), ImVec2(testx1 + 322, ((optionCount - (currentOption - maxOptions)) * 40 + testy1 + 290) + linetest3), ImVec2(testx1 + 331, ((optionCount - (currentOption - maxOptions)) * 40 + testy1 + 298) + linetest3), IM_COL32(submenuarrows.R, submenuarrows.G, submenuarrows.B, submenuarrows.A));
+
+    }
+
+
+
+
+
+
+
 
 }
 
@@ -199,12 +613,50 @@ int optionPress()
 }
 
 //ID3D11ShaderResourceView* Image = nullptr;
+void AddTitle(const char* titletext) {
 
+    ImDrawList* title = ImGui::GetBackgroundDrawList();
+
+    title->AddText(ImVec2(testx1+ 90,testy1+55),IM_COL32(textmain.R, textmain.G, textmain.B, textmain.A),titletext);
+
+}
 void drawHeader()
 {
-    renderheader = true;
- //   fuck->Image((PVOID)Image, ImVec2(80, 80));
-    // draw custom bitmap here
+  
+    ImDrawList* fuck = ImGui::GetBackgroundDrawList();
+
+
+
+
+     //   fuck->AddImage((PVOID)Image, ImVec2(testx1 + 10, testy1 + 50), ImVec2(testx1 + 350, testy1 - 30));
+
+        fuck->AddImage((PVOID)Image, ImVec2(testx1 + 10, testy1 - 30), ImVec2(testx1 + 350, testy1 + 50));
+
+        //white rectangles around header break
+        fuck->AddRectFilled(ImVec2(testx1 + 10, testy1 + 80), ImVec2(testx1 + 350, testy1 + 50), IM_COL32(seperatorrect.R, seperatorrect.G, seperatorrect.B, seperatorrect.A), 0.f, 0);
+
+        fuck->AddRect(ImVec2(testx1 + 10, testy1 + 80), ImVec2(testx1 + 233.333333333, testy1 + 50), IM_COL32(seperatorrectoutline.R, seperatorrectoutline.B, seperatorrectoutline.B, seperatorrectoutline.A), 0.f, 0);
+        fuck->AddRect(ImVec2(testx1 + 233.333333333, testy1 + 80), ImVec2(testx1 + 350, testy1 + 50), IM_COL32(seperatorrectoutline.R, seperatorrectoutline.B, seperatorrectoutline.B, seperatorrectoutline.A), 0.f, 0);
+      
+
+
+
+        //render option counter
+        std::string str1 = std::to_string(currentOption);
+        std::string str2 = std::to_string(optionCount);
+        std::string slash = "/";
+        std::string opcnt = str1 + slash + str2;
+       const char * printoptioncount = opcnt.c_str();
+
+        if (optionCount > maxOptions - 5) {
+            fuck->AddText(ImVec2(testx1 + 310, testy1 + 55), IM_COL32(textmain.R, textmain.G, textmain.B, textmain.A), printoptioncount);
+
+        }
+        else {
+            fuck->AddText(ImVec2(testx1 + 320, testy1 + 55), IM_COL32(textmain.R, textmain.G, textmain.B, textmain.A), printoptioncount);
+
+        }
+     
 
 }
 
@@ -227,15 +679,14 @@ void DrawBackground() {
     ImDrawList* draw = ImGui::GetBackgroundDrawList();
 
     //background
-    draw->AddRectFilled(ImVec2(testx1 + 10, testy1 + 500), ImVec2(testx1 + 350, testy1 + 80), IM_COL32(0, 0, 0, 160), 0.f, 0);
-    draw->AddRect(ImVec2(testx1 + 10, testy1 + 500), ImVec2(testx1 + 350, testy1 + 80), IM_COL32(0, 0, 0, 160), 0.f, 0);
+    draw->AddRectFilled(ImVec2(testx1 + 10, testy1 + 500), ImVec2(testx1 + 350, testy1 + 80), IM_COL32(backgroundrect.R, backgroundrect.G, backgroundrect.B, backgroundrect.A), 0.f, 0);
+    draw->AddRect(ImVec2(testx1 + 10, testy1 + 500), ImVec2(testx1 + 350, testy1 + 80), IM_COL32(backgroundrectoutline.R, backgroundrectoutline.G, backgroundrectoutline.B, backgroundrectoutline.A), 0.f, 0);
 
 
-    draw->AddRectFilled(ImVec2(testx1 + 10, testy1 + 80), ImVec2(testx1 + 350, testy1 + 50), IM_COL32(0, 0, 0, 255), 0.f, 0);
     //3 outer rectagles seperating
-    draw->AddRect(ImVec2(testx1 + 10, testy1 + 80), ImVec2(testx1 + 116.666666667, testy1 + 50), IM_COL32(255, 255, 255, 255), 0.f, 0);
-    draw->AddRect(ImVec2(testx1 + 116.666666667, testy1 + 80), ImVec2(testx1 + 233.333333333, testy1 + 50), IM_COL32(255, 255, 255, 255), 0.f, 0);
-    draw->AddRect(ImVec2(testx1 + 233.333333333, testy1 + 80), ImVec2(testx1 + 350, testy1 + 50), IM_COL32(255, 255, 255, 255), 0.f, 0);
+  //  draw->AddRect(ImVec2(testx1 + 10, testy1 + 80), ImVec2(testx1 + 116.666666667, testy1 + 50), IM_COL32(255, 255, 255, 255), 0.f, 0);
+   // draw->AddRect(ImVec2(testx1 + 116.666666667, testy1 + 80), ImVec2(testx1 + 233.333333333, testy1 + 50), IM_COL32(255, 255, 255, 255), 0.f, 0);
+  //  draw->AddRect(ImVec2(testx1 + 233.333333333, testy1 + 80), ImVec2(testx1 + 350, testy1 + 50), IM_COL32(255, 255, 255, 255), 0.f, 0);
 
     // }//scroller
 
@@ -244,13 +695,13 @@ void DrawBackground() {
         if (currentOption > maxOptions) {
 
 
-            draw->AddRectFilled(ImVec2(testx1 + 10, (maxOptions * 40) + 40 + testy1), ImVec2(testx1 + 350, (maxOptions * 40) + 75 + testy1), IM_COL32(255, 255, 255, 160), 0.f, 0);//fix after
+            draw->AddRectFilled(ImVec2(testx1 + 10, (maxOptions * 40) + 40 + testy1), ImVec2(testx1 + 350, (maxOptions * 40) + 75 + testy1), IM_COL32(scrollerrect.R, scrollerrect.G, scrollerrect.B, scrollerrect.A), 0.f, 0);//fix after
 
         }
         else {
             // GRAPHICS::DRAW_RECT(scrollerX, ((currentOption * 0.035f) + scrollerY), MainBackGroundWidth, 0.035f, scrollerRed, scrollerGreen, scrollerBlue, scrollerOpacity, 0);
             // draw->AddRectFilled(ImVec2(testx1 + 10, (currentOption * 40) + 10), ImVec2(testx1 + 350, (currentOption * 0.035f) + 30), IM_COL32(0, 0, 0, 255), 0.f, 0);//fix after
-            draw->AddRectFilled(ImVec2(testx1 + 10, (currentOption * 40) + 40 + testy1), ImVec2(testx1 + 350, (currentOption * 40) + 75 + testy1), IM_COL32(255, 255, 255, 160160), 0.f, 0);//fix after
+            draw->AddRectFilled(ImVec2(testx1 + 10, (currentOption * 40) + 40 + testy1), ImVec2(testx1 + 350, (currentOption * 40) + 75 + testy1), IM_COL32(scrollerrect.R, scrollerrect.G, scrollerrect.B, scrollerrect.A), 0.f, 0);//fix after
 
         }
 
@@ -259,44 +710,12 @@ void DrawBackground() {
 
 
 }
-void horizontalscrollerHandler() {
-    ImDrawList* draw = ImGui::GetBackgroundDrawList();
-
-    if (submenu == MAINMENU) {
-        if (currentOption == 1) {
-
-            if (GetAsyncKeyState(VK_UP) & 1) {
-                draw->AddRectFilled(ImVec2(testx1 + 10, testy1 + 80), ImVec2(testx1 + 116.666666667, testy1 + 50), IM_COL32(255, 255, 255, 160), 0.f, 0);
-
-                fuckTheScroller = true;
-            }
-
-
-
-        }
-        else {
-            fuckTheScroller = false;
-
-        }
-    }
-
-}
-//make option counter example from old native gta5
-
-/*
-//Checks whether option count is bigger than 10
-    if (optionCount > maxOptions - 5)
-        UI::END_TEXT_COMMAND_DISPLAY_TEXT(CounterX - 0.006f, CounterY,0);
-    //If not draw normally
-    else
-        UI::END_TEXT_COMMAND_DISPLAY_TEXT(CounterX, CounterY,0);
-*/
 
 
 void OpenMonitor()
 {
 
-    // optionCounter();
+   // optionCounter();
     DrawBackground();
     //   DisableControls();
 
@@ -347,6 +766,11 @@ void OpenMonitor()
         currentOption = 0;
 
     }
+    else if (GetAsyncKeyState(VK_F8) & 1) {
+        if (submenu == MAINMENU) {
+            submenu = CLOSED;
+        }
+    }
 
 
 }
@@ -379,48 +803,79 @@ void mainmenuloop() {
         OpenMonitor();
         ResetVars();
         submenuHandler();
-        //   horizontalscrollerHandler();
+       
 
           // DisableControls();
     }
 
     else ClosedMonitor();
-    //	}
+   
 }
 
 
 
 
 
-
+int  linetest1 = 350;
+float  linetest2 = 300;
+int page;
+const char* pages[]{ "Page1","Page2","Page3","Page4" };
 void MainMenu() {
+    AddTitle("Main Menu");
     addoption("Test");
-    addoption("Test2");
+    AddToggle("test toggle",&testbool);
+    AddToggle("test toggle2", &testbool2);
+    addbreak("[Test Break]");
+    if (AddInt("integer test", &linetest1,1,10,1, [] {}));
+    if (AddFloat("float test", &linetest2, 1.111, 10.160, 1.116, [] {}));
+    AddString("Test String", page[pages], &page, 0, 3);
+    AddFunction("Open ClickUI Settings menu", [] {
+        opensettings = true;
+        });
+    AddSubmenu("Settings Submenu", SETTINGS);
     addoption("Test3");
-    addoption("Test4");
-    addoption("Test5");
-    AddSubmenu("Test SUbmenu", TESTMENU);
-    addoption("Test6");
-    addoption("Test7");
-    addoption("Test8");
-    addoption("Test9");
-    addoption("Test10");
-    addoption("Test11");
-    addoption("Test12");
+
+   
 
 }
 
-void testmenu() {
-    addoption("Test");
-    addoption("Test2");
-    addoption("Test3");
-    addoption("Test4");
-    addoption("Test5");
-    AddSubmenu("Test SUbmenu 2", TESTMENUDOS);
+void settingsmenu() {
+    if (opensettings) {
+
+        ImGui::Begin("Settings");
+        ImGui::Text("Change menu X & Y Pos");
+        ImGui::SliderInt("X###sizex", &testx1, 0, 2000);
+        ImGui::SliderInt("X###sizy", &testy1, 0, 2000);
+
+
+        //  ImGui::ColorButton();
+        if(ImGui::Button("Close settings")){
+            opensettings = false;
+        }
+        ImGui::End();
+
+
+    }
+ 
+}
+
+
+void settings() {
+    AddTitle("Settings");
+    if (AddInt("integer test", &testx1, -1000, 2000, 25, [] {}));
+    if (AddInt("integer test", &testy1, -1000, 2000, 25, [] {}));
+
 
 }
 void testmenudos() {
+    AddTitle("Menu 3");
 
+    addoption("Test");
+    addoption("Test2");
+    addoption("Test3");
+    AddSubmenu("Back to main menu", MAINMENU);
+    AddSubmenu("Back to main menu", MAINMENU);
+    AddSubmenu("Back to main menu", MAINMENU);
 }
 
 
@@ -479,7 +934,6 @@ void Colors( ) {
 
     style.Colors[ImGuiCol_Border] = ImColor( 0 , 0 , 0 , 255 );
 }
-ID3D11ShaderResourceView* Image = nullptr;
 
 int StartRendering( ) 
 {   
@@ -515,10 +969,6 @@ int StartRendering( )
 
 
 
-  //  D3DX11_IMAGE_LOAD_INFO info;
-  //  ID3DX11ThreadPump* pump{ nullptr };
- //   D3DX11CreateShaderResourceViewFromMemory(g_pd3dDevice, rawData, sizeof(rawData), &info,
-  //      pump, &Image, 0);
 
 
 
@@ -527,7 +977,6 @@ int StartRendering( )
     D3DX11CreateShaderResourceViewFromMemory(g_pd3dDevice, rawData, sizeof(rawData), &info,
         pump, &Image, 0);
 
-    //drawHeader(*Image);
 
 
    
@@ -594,18 +1043,10 @@ int StartRendering( )
 
 
 
-        ImGui::NewFrame( );
-       ImGui::Begin("Hello world!");
-        ImGui::Image((PVOID)Image, ImVec2(80, 80));
-        ImDrawList* fuck = ImGui::GetBackgroundDrawList();
+         ImGui::NewFrame();
+    
 
-        if (renderheader) {
-            fuck->AddImage((PVOID)Image, ImVec2(testx1 + 10, testy1 + 50), ImVec2(testx1 + 350, testy1 -10));
-        }
-       
-        ImGui::End();
-
-     ImGui::Begin("Window");
+     ImGui::Begin("Test Window");
      {
          ImGui::Text("Hello, Dear ImGUI!");
          ImGui::SliderInt("X###sizex", &testx1, 0, 2000);
@@ -614,10 +1055,17 @@ int StartRendering( )
          ImGui::Text("------------------------");
          ImGui::SliderInt("yyyMovableY###MoyyvY", &epictestya, 0, 2000);
          ImGui::SliderInt("yyyMovableY###MovyyY", &epictestyb, 0, 2000);
+      
+         ImGui::Text("------------------------");
 
+         ImGui::SliderInt("yyMovableY###MofyvY", &linetest1, 0, 2000);
+         ImGui::SliderFloat("yyMovableY###MoyyY", &linetest2, 0, 2000);
+       //  ImGui::SliderInt("yyMovableY###MoyhyvY", &linetest3, -1000, 10);
+       //  ImGui::SliderInt("yyMovableY###MovyhyY", &linetest4, -10, 10);
      }
    
      mainmenuloop();
+     settingsmenu();
      ImGui::End();
 
         // 480 x 295

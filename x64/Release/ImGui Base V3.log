@@ -1,15 +1,7 @@
-﻿  imgui.cpp
-  imgui_demo.cpp
-  imgui_draw.cpp
-  imgui_impl_dx11.cpp
-  imgui_impl_win32.cpp
-  imgui_tables.cpp
-  imgui_widgets.cpp
-  renderer.cpp
-  source.cpp
+﻿  renderer.cpp
   Generating code
-  1450 of 1455 functions (99.7%) were compiled, the rest were copied from previous compilation.
-    33 functions were new in current compilation
-    1 functions had inline decision re-evaluated but remain unchanged
+  2 of 1586 functions ( 0.1%) were compiled, the rest were copied from previous compilation.
+    0 functions were new in current compilation
+    18 functions had inline decision re-evaluated but remain unchanged
   Finished generating code
   ImGui Base V3.vcxproj -> Z:\GTAMODSWORKSPACE\aaaaaaa\NotACheatUI\x64\Release\ImGui Base V3.exe
